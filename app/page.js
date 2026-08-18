@@ -30,7 +30,11 @@ export default function HomePage() {
         <div className="eyebrow reveal" style={{ justifyContent: "center" }}>
           Let&apos;s Build It
         </div>
-        <h2 className="reveal">Have an idea? Have a problem?</h2>
+        <h2 className="reveal">
+          Have an idea?
+          <br />
+          Have a problem?
+        </h2>
         <p className="sub reveal">
           Tell us what you&apos;re trying to solve. We&apos;ll come back with the right approach —
           not a sales pitch.
