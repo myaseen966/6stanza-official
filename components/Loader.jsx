@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { markSiteReady } from "@/lib/siteReady";
 
 export default function Loader() {
   const [visible, setVisible] = useState(true);
@@ -27,6 +28,9 @@ export default function Loader() {
         document.body.style.overflow = "";
         // let ScrollTrigger re-measure now that everything is visible/unlocked
         window.dispatchEvent(new Event("resize"));
+        // Source of truth for "is the page actually scrollable yet" —
+        // MotionController waits on this before touching ScrollTrigger.
+        markSiteReady();
       }, 500);
     });
 

@@ -3,20 +3,38 @@
 import { useEffect } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
+import { onSiteReady } from "@/lib/siteReady";
 
 export default function MotionController() {
   useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const ctx = gsap.context(() => {
+    // Wait for the Loader to actually finish and unlock the page before
+    // measuring anything with ScrollTrigger. If this ran immediately on
+    // mount, body still has overflow:hidden (the Loader hasn't unlocked it
+    // yet), so the page has no real scroll room — every reveal animation
+    // would snap straight to its finished state before the loader even
+    // clears, which is exactly why you'd see everything "already there"
+    // with no animation. onSiteReady() (see lib/siteReady.js) fires this
+    // callback the instant Loader unlocks the page — or immediately, if
+    // that already happened before this effect even ran.
+    let cancelled = false;
+    let revert = () => {};
+
+    const unsubscribe = onSiteReady(() => {
+      if (cancelled) return;
+      runSetup();
+    });
+
+    function runSetup() {
+      if (cancelled) return;
+      gsap.registerPlugin(ScrollTrigger);
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const ctx = gsap.context(() => {
       const nav = document.getElementById("mainNav");
 
-      // Smooth, correctly-offset scrolling for every in-page nav link (Six S,
-      // About, Capabilities, Process, Vision, Start a Project). Using GSAP's
-      // own scrollTo — rather than the browser's default anchor jump — keeps
-      // this smooth and accurate even though several sections are pinned,
-      // which changes the page's real layout height as you scroll.
+      // Every in-page nav link (Six S, About, Capabilities, Process, Vision,
+      // Start a Project) jumps straight to its section — no scrolling motion
+      // through the sections in between — and then replays that section's
+      // arrival animation, exactly as if you'd scrolled to it normally.
       document.querySelectorAll('a[href^="#"]').forEach((link) => {
         const handler = (e) => {
           const id = link.getAttribute("href");
@@ -24,14 +42,24 @@ export default function MotionController() {
           const target = document.querySelector(id);
           if (!target) return;
           e.preventDefault();
-          if (reduceMotion) {
-            target.scrollIntoView({ block: "start" });
-            return;
-          }
-          gsap.to(window, {
-            duration: 1.1,
-            scrollTo: { y: target, offsetY: 84 },
-            ease: "power2.inOut",
+
+          const y = target.getBoundingClientRect().top + window.scrollY - 84;
+          window.scrollTo(0, Math.max(0, y));
+
+          if (reduceMotion) return;
+
+          // The jump above is instant, not a smooth scroll, so it won't
+          // naturally play through this section's reveal the way normal
+          // scrolling does. Instead, directly replay the exact ScrollTrigger
+          // animation(s) already registered for anything inside the target
+          // section — same tweens used for normal scroll-reveals, just
+          // restarted on demand, so it's identical motion either way.
+          requestAnimationFrame(() => {
+            ScrollTrigger.getAll().forEach((st) => {
+              if (st.trigger && target.contains(st.trigger) && st.animation) {
+                st.animation.restart(true);
+              }
+            });
           });
         };
         link.addEventListener("click", handler);
@@ -74,6 +102,32 @@ export default function MotionController() {
             duration: 0.8,
             ease: "power2.out",
             scrollTrigger: { trigger: el, start: "top 85%", toggleActions: "play none none reverse" },
+          }
+        );
+      });
+
+      // Process, Vision, and Six S are pinned/scrubbed sections — all their
+      // motion is driven continuously by scroll position once you're inside
+      // them (steps sliding, stages crossfading, panels sliding sideways).
+      // But unlike About/Capabilities, they never had an actual "arrival"
+      // moment: nothing fades or rises in as you first reach them. Give each
+      // one the same fade+rise entrance as a generic .reveal, timed to play
+      // just before its own pin engages. Being a real tween tied to a
+      // ScrollTrigger (not just an onUpdate callback), this both fires
+      // naturally on real scroll AND gets picked up correctly by the
+      // nav-click restart logic above.
+      ["#process", "#vision", "#six-s"].forEach((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return;
+        gsap.fromTo(
+          el,
+          { opacity: 0, y: 24 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: "power2.out",
+            scrollTrigger: { trigger: el, start: "top 90%", toggleActions: "play none none reverse" },
           }
         );
       });
@@ -214,16 +268,26 @@ export default function MotionController() {
 
       ScrollTrigger.refresh();
 
-      // Fonts and the (relatively large) hero logo can finish loading after this
-      // effect first runs, which changes real layout size. Re-measure once they're
-      // ready so pinned-section distances (esp. the Six S filmstrip) stay accurate.
+      // Fonts (and the relatively large hero logo) can occasionally still be
+      // settling their final rendered size right as this runs. Re-measure
+      // once fonts are ready so pinned-section distances (esp. the Six S
+      // filmstrip) stay accurate. (No need to also wait for window's 'load'
+      // event here — this whole block only runs after Loader's site:ready
+      // signal, which by definition only fires after 'load' has already
+      // happened.)
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(() => ScrollTrigger.refresh());
       }
-      window.addEventListener("load", () => ScrollTrigger.refresh());
-    });
+      });
 
-    return () => ctx.revert();
+      revert = () => ctx.revert();
+    }
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      revert();
+    };
   }, []);
 
   return null;
