@@ -31,7 +31,7 @@ export default function MotionController() {
       const ctx = gsap.context(() => {
       const nav = document.getElementById("mainNav");
 
-      // Every in-page nav link (Six S, About, Capabilities, Process, Vision,
+      // Every in-page nav link (Six S, About, Services, Process, Vision,
       // Start a Project) jumps straight to its section — no scrolling motion
       // through the sections in between — and then replays that section's
       // arrival animation, exactly as if you'd scrolled to it normally.
@@ -43,7 +43,18 @@ export default function MotionController() {
           if (!target) return;
           e.preventDefault();
 
-          const y = target.getBoundingClientRect().top + window.scrollY - 84;
+          // Pinned sections (Six S, Process, Vision) are a special case:
+          // once you've scrolled PAST one, GSAP repositions the actual
+          // element at the END of its reserved scroll span (so it stays put
+          // where you left it, unpinned) rather than the start. Reading its
+          // live getBoundingClientRect() from a later section therefore
+          // lands you at the section's END state — e.g. clicking "Six S"
+          // while on About would drop you on panel 6, not panel 1. Instead,
+          // jump to that section's own pin ScrollTrigger.start — the exact
+          // scroll position where the pin engages at progress 0 — which is
+          // stable no matter where you're scrolling from.
+          const pinST = ScrollTrigger.getAll().find((st) => st.pin && st.trigger === target);
+          const y = pinST ? pinST.start : target.getBoundingClientRect().top + window.scrollY - 84;
           window.scrollTo(0, Math.max(0, y));
 
           if (reduceMotion) return;
@@ -109,7 +120,7 @@ export default function MotionController() {
       // Process, Vision, and Six S are pinned/scrubbed sections — all their
       // motion is driven continuously by scroll position once you're inside
       // them (steps sliding, stages crossfading, panels sliding sideways).
-      // But unlike About/Capabilities, they never had an actual "arrival"
+      // But unlike About/Services, they never had an actual "arrival"
       // moment: nothing fades or rises in as you first reach them. Give each
       // one the same fade+rise entrance as a generic .reveal, timed to play
       // just before its own pin engages. Being a real tween tied to a

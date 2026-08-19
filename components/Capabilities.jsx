@@ -6,10 +6,10 @@ const groups = [
 
 export default function Capabilities() {
   return (
-    <section className="section" id="capabilities">
+    <section className="section" id="services">
       <div className="eyebrow reveal">What We Do</div>
       <h2 className="reveal" style={{ fontSize: "clamp(28px,3.6vw,44px)" }}>
-        Capabilities, grouped by outcome
+        Services, grouped by outcome
       </h2>
       <div className="cap-grid">
         {groups.map((g) => (

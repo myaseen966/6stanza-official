@@ -23,7 +23,7 @@ export default function Footer() {
             <a href="#vision">Vision</a>
           </div>
           <div className="footer-col">
-            <h5>Capabilities</h5>
+            <h5>Services</h5>
             <span>Technology</span>
             <span>Growth</span>
             <span>Creative</span>
